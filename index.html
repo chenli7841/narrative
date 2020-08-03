@@ -1,0 +1,343 @@
+<html>
+  
+  <script src="https://d3js.org/d3.v5.min.js"></script>
+  <script src="https://unpkg.com/d3-simple-slider"></script>
+  <style>
+    body {
+	  font-family: Arial, Helvetica, sans-serif;
+	}
+	.content {
+	  width: 900px;
+	  margin-left: auto;
+	  margin-right: auto;
+	}
+	.content h1, h3 {
+	  text-align: center;
+	}
+	.flex {
+	  display: flex;
+	}
+	.description {
+	  width: 300px;
+	}
+	.pager {
+	  height: 50px;
+	  display: flex;
+	}
+	.pager button {
+	  border-width: 0px;
+	  border-radius: 0px;
+	  background-color: white;
+	  width: 25px;
+	  height: 25px;
+	}
+	.pager button.isActive {
+	  background-color: steelblue;
+	  color: white;
+	}
+	.pager button:focus {
+	  outline: none;
+	}
+	a {
+	  text-decoration: none;
+	}
+    .axisBlue { stroke: steelblue; }
+	.axisBlue path { stroke: steelblue; }
+	.axisRed { stroke: tomato; }
+	.axisRed path { stroke: tomato; }
+	#tooltip {
+	  opacity: 0;
+	  position: absolute;
+	  background: white;
+	  border: 1px steelblue solid;
+	  padding: 10px;
+	}
+	.gdppoints circle {
+	  opacity: 0;
+	  fill: steelblue;
+	}
+	.cpipoints circle {
+	  opacity: 0;
+	  fill: tomato;
+	}
+  </style>
+  <body>
+    <div id="tooltip" opacity=0></div>
+	<div class="content">
+	  <h1>COVID-19 Impact on US GDP and CPI</h1>
+	  <h3>How much would COVID-19 impact US GDP and CPI?</h3>
+	  <div class="flex">
+	    <div class="description">
+		  <div class="pager">
+		    <button id="page1Btn" onclick='goToScene(1)'>1</button>
+			<button id="page2Btn" onclick='goToScene(2)'>2</button>
+			<button id="page3Btn" onclick='goToScene(3)'>3</button>
+			<button id="page4Btn" onclick='goToScene(4)'>4</button>
+			<button id="page5Btn" onclick='goToScene(5)'>5</button>
+		  </div>
+		  <div id="page1Text">
+		  	<h4>Terminology</h4>
+		    <div>
+		      <b>Gross Domestic Product (GDP)</b>
+			  <p>- The total monetary value of final goods and services produced in a country in a given period of time (one quarter or one year).<sup><a href='https://www.imf.org/external/pubs/ft/fandd/basics/gdp.htm' target='_blank'>[1]</a></sup></p>
+			  <p>- Reflects economic growth.</p>
+			  <p>- <a href='https://data.worldbank.org/indicator/NY.GDP.MKTP.CD?locations=US' target='_blank'>Data Source</a></p>
+			</div>
+			<br/>
+			<div>
+			  <b>Consumer Price Index (CPI)</b>
+			  <p>- A measure of the prices paid by urban consumers for a market basket of consumer goods and services.</p>
+			  <p>- Reflects inflation rate.</p>
+			  <p>- <a href='https://www.usinflationcalculator.com/inflation/consumer-price-index-and-annual-percent-changes-from-1913-to-2008/' target='_blank'>Data Source</a></p>
+			</div>
+		  </div>
+		  <div id="page2Text" style='display: none'>
+			<h4>1961 - 1973</h4>
+		    <div>
+			  <b>Vietnam War</b>
+			  <p>- Flourished defense industry drived economy 1961-1968 (high growth, low inflation).</p>
+			  <p>- War deficit caused mild recession 1969-1970 (lower growth, higher inflation).</p>
+			</div>
+		  </div>
+		  <div id="page3Text" style='display: none'>
+		    <h4>1973 - 1981</h4>
+		    <div>
+			  <b>First Oil Crisis</b>
+			  <p>- Oil price quadrupled from October 1973 to January 1974.<sup><a href='https://www.federalreservehistory.org/essays/oil_shock_of_1973_74' target='_blank'>[1]</a></sup></p>
+			  <b>Second Oil Crisis</b>
+			  <p>- Oil price doubled in 12 months from 1979 to 1980.</p>
+			  <b>Stagflation</b>
+			  <p>- Low growth, high inflation, high unemployment.</p>
+			</div>
+		  </div>
+		  <div id="page4Text" style='display: none'>
+		    <h4>1982 - 2007</h4>
+		    <div>
+			  <b>Reaganomics (1982-1988)</b>
+			  <p>- Major reduction in government spending.</p>
+			  <b>Information Revolution (1996-present)</b>
+			  <p>- Enormous number of employments in IT industry are created.</p>
+			  <p>- High growth, low inflation.</p>
+			</div>
+		  </div>
+		  <div id="page5Text" style='display: none'>
+		    <h4>2008 - 2019</h4>
+		    <div>
+			  <p><b>Financial Crisis (2008-2012)</b></p>
+			  <p><b>Recovery (2012-2019)</b></p>
+			</div>
+		  </div>
+		</div>
+		<div>
+		<svg width="600" height="500"></svg>
+		<div class="row align-items-center">
+          <div id="slider-time"></div>
+        </div>
+		</div>
+	  </div>
+	</div>
+	<script>
+	  const totalScenes = 5;
+	  let allData = [];
+	  const width = 600, height = 500, hmargin = 50, vmargin = 50;
+	  const tooltip = d3.select('#tooltip');
+	  const xs = d3.scaleLinear().domain([1960,2020]).range([0,width-hmargin*2]);
+	  let sliderTime;
+	  function initPlot() {
+	    const svg = d3.select('svg');
+	    const translation = `translate(${hmargin},${vmargin})`;
+	    d3.csv('data.csv').then(data => {
+		  allData = data;
+	      const ys1 = d3.scaleLinear().domain([0,21500]).range([height-vmargin*2,0]);
+		  const ys2 = d3.scaleLinear().domain([0,260]).range([height-vmargin*2,0]);
+		  svg.append('g').attr('transform', translation).attr("class", "axisBlue").call(d3.axisLeft(ys1));
+		  svg.append('g').attr('transform', `translate(${width-hmargin},${vmargin})`).attr('class', 'axisRed').call(d3.axisRight(ys2));
+		  svg.append('g').attr('transform', `translate(${hmargin},${height-vmargin})`).call(d3.axisBottom(xs).tickFormat(d3.format('')));
+          const dataTime = d3.range(0, 61, 10).map(d => new Date(1960+d,1,1));
+		  sliderTime = d3.sliderBottom()
+		    .min(d3.min(dataTime))
+			.max(d3.max(dataTime))
+			.step(1000*60*60*24*365)
+			.width(width-2*hmargin)
+			.tickFormat(d3.timeFormat('%Y'))
+			.tickValues(dataTime)
+			.default(new Date(1960, 1, 1))
+			.on('onchange', val => {
+			  const selectedYear = val.getFullYear();
+			  if (selectedYear <= 1973) {
+			    updateScene(2);
+			  } else if (selectedYear <= 1981) {
+			    updateScene(3);
+			  } else if (selectedYear <= 2007) {
+			    updateScene(4);
+			  } else {
+			    updateScene(5);
+			  }
+			});
+		  const gTime = d3.select('#slider-time').append('svg')
+		    .attr('width', width)
+		    .attr('height', 100)
+			.append('g')
+			.attr('transform', 'translate(50,8)');
+		  gTime.call(sliderTime);
+
+		  svg.append('g').attr('transform', translation)
+		    .append("path").datum(data)
+		    .attr("fill", "none")
+            .attr("stroke", "steelblue")
+            .attr("stroke-width", 1.5)
+            .attr("d", d3.line()
+              .x((d) => xs(d.Year))
+              .y((d) => ys1(d.GDP))
+            );
+		  svg.append('g').attr('transform', 'translate(50,50)')
+		    .append("path").datum(data)
+		    .attr("fill", "none")
+            .attr("stroke", "tomato")
+            .attr("stroke-width", 1.5)
+            .attr("d", d3.line()
+              .x((d) => xs(d.Year))
+              .y((d) => ys2(d.CPI))
+            );
+		  svg.append('g').attr('transform', translation)
+		    .attr('class', 'gdppoints')
+		    .selectAll('circle').data(data).enter().append('circle')
+		    .attr('r', 4)
+		    .attr('cx', d => xs(d.Year))
+		    .attr('cy', d => ys1(d.GDP));
+		  svg.append('g').attr('transform', translation)
+		    .attr('class', 'cpipoints')
+		    .selectAll('circle').data(data).enter().append('circle')
+		    .attr('r', 4)
+		    .attr('cx', d => xs(d.Year))
+		    .attr('cy', d => ys2(d.CPI));
+		  svg.append('g').attr('transform', translation)
+		    .attr('class', 'region')
+		    .selectAll('rect').data(data).enter().append('rect')
+		    .attr('width', '10px')
+		    .attr('height', `${height-vmargin*2}px`)
+		    .attr('opacity',0)
+		    .attr('x', d => xs(d.Year)-5)
+		    .attr('y', '0px')
+		    .on('mouseover', (d,i) => {
+		      const regionEl = document.getElementsByClassName('region')[0].children[i];
+			  regionEl.style.opacity = 0.1;
+			  const gdpEl = document.getElementsByClassName('gdppoints')[0].children[i];
+			  gdpEl.style.opacity = 1;
+			  const cpiEl = document.getElementsByClassName('cpipoints')[0].children[i];
+			  cpiEl.style.opacity = 1;
+			  tooltipHTML = `
+			    <table>
+			    <tr><td style='width: 13px'>&bull;</td><td style='width: 130px'>Year</td><td>${d.Year}</td></tr>
+			    <tr style='color: steelblue'><td>&bull;</td><td>GDP (in Billion $):</td><td>${Math.round(d.GDP)}</td></tr>
+			    <tr style='color: steelblue'><td>&bull;</td><td>Annual Growth:</td><td>${Math.round(d.Growth*10000)/100} %</td></tr>
+			    <tr style='color: tomato'><td>&bull;</td><td>CPI:</td><td>${Math.round(d.CPI)}</td></tr>
+			    <tr style='color: tomato'><td>&bull;</td><td>Inflation Rate:</td><td>${Math.round(d.Inflation_Rate*10000)/100} %</td></tr>
+			    </table>
+			  `;
+		      tooltip.style('opacity', 1)
+			    .style('left', (d3.event.pageX + 15)+'px')
+			    .style('top', (d3.event.pageY)+'px')
+			    .html(tooltipHTML);
+		    })
+		    .on('mouseout', (d,i) => {
+		      const regionEl = document.getElementsByClassName('region')[0].children[i];
+			  regionEl.style.opacity = 0;
+			  const gdpEl = document.getElementsByClassName('gdppoints')[0].children[i];
+			  gdpEl.style.opacity = 0;
+		      const cpiEl = document.getElementsByClassName('cpipoints')[0].children[i];
+			  cpiEl.style.opacity = 0;
+		      tooltip.style('opacity', 0);
+		    });
+			goToScene(1);
+	    });
+	  }
+	  function goToScene(scene) {
+	    updateScene(scene);
+		switch(scene) {
+		  case 2:
+		    sliderTime.value(new Date(1973,1,1));
+			break;
+		  case 3:
+		    sliderTime.value(new Date(1981,1,1));
+			break;
+		  case 4:
+		    sliderTime.value(new Date(2007,1,1));
+			break;
+		  case 5:
+		    sliderTime.value(new Date(2020,1,1));
+			break;
+		}
+	  }
+	  function updateScene(scene) {
+	    for (let i = 1; i <= totalScenes; i++) {
+		  document.getElementById(`page${i}Text`).style.display = 'none';
+		  document.getElementById(`page${i}Btn`).className = '';
+		}
+		document.getElementById(`page${scene}Text`).style.display = '';
+		document.getElementById(`page${scene}Btn`).className = 'isActive';
+		switch(scene) {
+		  case 2:
+		    showPartialPlot(1973);
+			break;
+		  case 3:
+		    showPartialPlot(1981);
+		    break;
+		  case 4:
+		    showPartialPlot(2007);
+		    break;
+		  case 5:
+		    showPartialPlot(2020);
+		    break;
+		  case 1:
+		  default:
+		  	showPartialPlot(2020);
+			break;
+		}
+	  }
+	  function showPartialPlot(end) {
+	    d3.select('.region').selectAll('rect').data(allData)
+		.attr('width', '10px')
+		.attr('height', `${height-vmargin*2}px`)
+		.attr('opacity', d => d.Year <= end ? 0 : 1)
+		.style('opacity', d => d.Year <= end ? 0 : 1)
+		.attr('fill', d => d.Year <= end ? 'black' : 'white')
+		.attr('x', d => xs(d.Year)-5)
+		.attr('y', '0px')
+		.on('mouseover', (d,i) => {
+		  if (d.Year > end) return;
+		  const regionEl = document.getElementsByClassName('region')[0].children[i];
+		  regionEl.style.opacity = 0.1;
+		  const gdpEl = document.getElementsByClassName('gdppoints')[0].children[i];
+		  gdpEl.style.opacity = 1;
+		  const cpiEl = document.getElementsByClassName('cpipoints')[0].children[i];
+		  cpiEl.style.opacity = 1;
+		  tooltipHTML = `
+			<table>
+			<tr><td style='width: 13px'>&bull;</td><td style='width: 130px'>Year</td><td>${d.Year}</td></tr>
+			<tr style='color: steelblue'><td>&bull;</td><td>GDP (in Billion $):</td><td>${Math.round(d.GDP)}</td></tr>
+			<tr style='color: steelblue'><td>&bull;</td><td>Annual Growth:</td><td>${Math.round(d.Growth*10000)/100} %</td></tr>
+			<tr style='color: tomato'><td>&bull;</td><td>CPI:</td><td>${Math.round(d.CPI)}</td></tr>
+			<tr style='color: tomato'><td>&bull;</td><td>Inflation Rate:</td><td>${Math.round(d.Inflation_Rate*10000)/100} %</td></tr>
+			</table>
+		  `;
+		  tooltip.style('opacity', 1)
+			.style('left', (d3.event.pageX + 15)+'px')
+			.style('top', (d3.event.pageY)+'px')
+			.html(tooltipHTML);
+		})
+		.on('mouseout', (d,i) => {
+		  if (d.Year > end) return;
+		  const regionEl = document.getElementsByClassName('region')[0].children[i];
+		  regionEl.style.opacity = 0;
+		  const gdpEl = document.getElementsByClassName('gdppoints')[0].children[i];
+		  gdpEl.style.opacity = 0;
+		  const cpiEl = document.getElementsByClassName('cpipoints')[0].children[i];
+		  cpiEl.style.opacity = 0;
+		  tooltip.style('opacity', 0);
+		});
+	  }
+	  initPlot();
+	</script>
+  </body>
+</html>
